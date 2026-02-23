@@ -5,7 +5,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .env
-.env.*
 
 # Build outputs (comunes)
 dist/
