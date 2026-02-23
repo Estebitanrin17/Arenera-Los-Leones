@@ -9,34 +9,38 @@
 
     export const authService = {
     async login({ email, password }) {
-        const e = new Error("Credenciales inválidas");
-            e.statusCode = 401;
-            throw e;
+    email = email.trim().toLowerCase();
 
+    const user = await authRepo.findUserByEmail(email);
 
-        if (!user || !user.is_active) {
-        const e = new Error("Credenciales inválidas");
-        e.statusCode = 401;
-        throw e;
-        }
-
-        const ok = await bcrypt.compare(password, user.password_hash);
-        if (!ok) {
+    if (!user || !user.is_active) {
         const e = new Error("Credenciales inválidas");
         e.statusCode = 401;
         throw e;
-        }
+    }
 
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) {
+        const e = new Error("Credenciales inválidas");
+        e.statusCode = 401;
+        throw e;
+    }
 
-        return {
+    const token = jwt.sign(
+        { sub: user.id, role: user.role, name: user.full_name },
+        env.jwtSecret,
+        { expiresIn: "8h" }
+    );
+
+    return {
         token,
         user: {
-            id: user.id,
-            fullName: user.full_name,
-            email: user.email,
-            role: user.role
+        id: user.id,
+        fullName: user.full_name,
+        email: user.email,
+        role: user.role
         }
-        };
+    };
     },
 
     // DEV: devuelve el código en la respuesta (luego lo mandarás por correo/whatsapp)
