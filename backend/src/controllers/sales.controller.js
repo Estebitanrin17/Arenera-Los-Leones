@@ -19,7 +19,13 @@
 
     const paymentSchema = z.object({
     amount: z.preprocess(toNumber, z.number().min(0.01)),
-    method: z.enum(["CASH","TRANSFER","CARD","OTHER"]).default("CASH"),
+    method: z.enum(["CASH", "TRANSFER", "CARD", "OTHER"]).default("CASH"),
+    note: z.string().max(255).optional()
+    });
+
+    const refundSchema = z.object({
+    amount: z.preprocess(toNumber, z.number().min(0.01)),
+    method: z.enum(["CASH", "TRANSFER", "CARD", "OTHER"]).default("CASH"),
     note: z.string().max(255).optional()
     });
 
@@ -55,6 +61,15 @@
         const saleId = Number(req.params.id);
         const data = paymentSchema.parse(req.body);
         const sale = await salesService.addPayment({ saleId, ...data, createdBy: req.user.sub });
+        res.json({ ok: true, data: sale });
+        } catch (e) { next(e); }
+    },
+
+    async addRefund(req, res, next) {
+        try {
+        const saleId = Number(req.params.id);
+        const data = refundSchema.parse(req.body);
+        const sale = await salesService.addRefund({ saleId, ...data, createdBy: req.user.sub });
         res.json({ ok: true, data: sale });
         } catch (e) { next(e); }
     },
