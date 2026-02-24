@@ -4,6 +4,8 @@ import productsRoutes from "./products.routes.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import inventoryRoutes from "./inventory.routes.js";
 import salesRoutes from "./sales.routes.js";
+import reportsRoutes from "./reports.routes.js";
+import expensesRoutes from "./expenses.routes.js";
 
 const router = Router();
 
@@ -19,5 +21,9 @@ router.use("/products", productsRoutes);
 router.use("/inventory", inventoryRoutes);
 
 router.use("/sales", salesRoutes);
+
+router.use("/reports", reportsRoutes);
+
+router.use("/expenses", expensesRoutes);
 
 export default router;

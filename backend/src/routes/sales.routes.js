@@ -16,7 +16,10 @@ router.post("/", salesController.create);
 // pagos: OWNER y EMPLOYEE
 router.post("/:id/payments", salesController.addPayment);
 
-// cancelar: solo OWNER (recomendado)
+// reembolso: recomendado solo OWNER
+router.post("/:id/refunds", requireRole("OWNER"), salesController.addRefund);
+
+// cancelar: solo OWNER
 router.post("/:id/cancel", requireRole("OWNER"), salesController.cancel);
 
 export default router;
