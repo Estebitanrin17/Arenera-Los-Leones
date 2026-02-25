@@ -1,0 +1,35 @@
+:root{
+  --bg:#0B1220;
+  --card:#0F213A;
+  --border:rgba(255,255,255,.08);
+  --text:rgba(255,255,255,.92);
+  --muted:rgba(255,255,255,.65);
+
+  --brand-500:#155A9C;
+  --accent-500:#14B8A6;
+  --warn-500:#F59E0B;
+  --danger-500:#EF4444;
+
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+  --radius:16px;
+}
+
+.ui-card{
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.ui-btn{
+  border-radius: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: rgba(255,255,255,.04);
+  cursor:pointer;
+}
+.ui-btn:hover{ background: rgba(255,255,255,.07); }
+.ui-btn--primary{
+  border: 1px solid rgba(21,90,156,.45);
+  background: linear-gradient(180deg, rgba(21,90,156,.55), rgba(14,58,102,.55));
+}

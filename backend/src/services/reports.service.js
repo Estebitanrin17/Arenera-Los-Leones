@@ -1,7 +1,7 @@
     import ExcelJS from "exceljs";
     import PDFDocument from "pdfkit";
     import { reportsRepo } from "../repositories/reports.repo.js";
-    import { salesRepo } from "../repositories/sales.repo.js"; // ya lo tenías
+    import { salesRepo } from "../repositories/sales.repo.js";
 
     function httpError(statusCode, message) {
     const e = new Error(message);
@@ -9,13 +9,10 @@
     return e;
     }
 
-    function toDateRange({ from, to }) {
-    // para sales usabas datetime; para expenses usaremos DATE (YYYY-MM-DD)
-    return { from, to };
-    }
-
     export const reportsService = {
-    // ====== YA TENÍAS ESTO (ventas Excel/PDF) ======
+    // =========================
+    // VENTAS: Excel
+    // =========================
     async buildSalesExcel({ from, to, status }) {
         const fromDT = `${from} 00:00:00`;
         const toDT = `${to} 23:59:59`;
@@ -91,6 +88,9 @@
         return await wb.xlsx.writeBuffer();
     },
 
+    // =========================
+    // VENTAS: PDF
+    // =========================
     async streamSalePdf({ saleId, res }) {
         const sale = await salesRepo.getById(saleId);
         if (!sale) throw httpError(404, "Venta no encontrada");
@@ -156,11 +156,12 @@
         doc.end();
     },
 
-    // ====== NUEVO: GASTOS Excel ======
+    // =========================
+    // GASTOS: Excel
+    // =========================
     async buildExpensesExcel({ from, to, categoryId, includeInactive }) {
-        const { from: f, to: t } = toDateRange({ from, to });
-        const rows = await reportsRepo.expensesRows({ from: f, to: t, categoryId, includeInactive });
-        const summary = await reportsRepo.expensesSummaryByCategory({ from: f, to: t, includeInactive });
+        const rows = await reportsRepo.expensesRows({ from, to, categoryId, includeInactive });
+        const summary = await reportsRepo.expensesSummaryByCategory({ from, to, includeInactive });
 
         const wb = new ExcelJS.Workbook();
         wb.creator = "Arena System";
@@ -212,114 +213,12 @@
         return await wb.xlsx.writeBuffer();
     },
 
-        // ====== NUEVO: INVENTARIO Excel ======
-    async buildInventoryExcel({ warehouseId }) {
-    const rows = await reportsRepo.inventoryStockRows({ warehouseId });
-    const totals = await reportsRepo.inventoryTotals({ warehouseId });
-
-    const wb = new ExcelJS.Workbook();
-    wb.creator = "Arena System";
-
-    const ws = wb.addWorksheet("Inventario");
-    ws.columns = [
-        { header: "Producto ID", key: "product_id", width: 12 },
-        { header: "Producto", key: "name", width: 20 },
-        { header: "Gramaje", key: "gramaje", width: 10 },
-        { header: "Unidad", key: "unit", width: 10 },
-        { header: "Precio", key: "price", width: 12 },
-        { header: "Cantidad", key: "quantity", width: 12 }
-    ];
-    ws.getRow(1).font = { bold: true };
-
-    for (const r of rows) {
-        ws.addRow({
-        product_id: r.product_id,
-        name: r.name,
-        gramaje: r.gramaje,
-        unit: r.unit,
-        price: Number(r.price),
-        quantity: Number(r.quantity)
-        });
-    }
-
-    const wsSum = wb.addWorksheet("Resumen");
-    wsSum.columns = [
-        { header: "Métrica", key: "metric", width: 24 },
-        { header: "Valor", key: "value", width: 18 }
-    ];
-    wsSum.getRow(1).font = { bold: true };
-
-    wsSum.addRow({ metric: "Bodega ID", value: warehouseId });
-    wsSum.addRow({ metric: "Total productos activos", value: Number(totals.total_products) });
-    wsSum.addRow({ metric: "Total unidades (bultos)", value: Number(totals.total_units) });
-
-    return await wb.xlsx.writeBuffer();
-    },
-
-    // ====== NUEVO: INVENTARIO PDF ======
-    async streamInventoryPdf({ warehouseId, res }) {
-    const rows = await reportsRepo.inventoryStockRows({ warehouseId });
-    const totals = await reportsRepo.inventoryTotals({ warehouseId });
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename="inventario_bodega-${warehouseId}.pdf"`);
-
-    const doc = new PDFDocument({ margin: 40 });
-    doc.pipe(res);
-
-    doc.fontSize(18).text("REPORTE DE INVENTARIO", { align: "center" });
-    doc.moveDown(0.5);
-
-    doc.fontSize(11).text(`Bodega ID: ${warehouseId}`);
-    doc.text(`Total productos activos: ${Number(totals.total_products)}`);
-    doc.text(`Total unidades (bultos): ${Number(totals.total_units)}`);
-    doc.moveDown(1);
-
-    doc.fontSize(12).text("Stock actual", { underline: true });
-    doc.moveDown(0.5);
-
-    // Encabezados
-    doc.fontSize(10);
-    doc.text("Producto", 40, doc.y, { continued: true, width: 220 });
-    doc.text("Gramaje", 260, doc.y, { continued: true, width: 60, align: "right" });
-    doc.text("Cant", 320, doc.y, { continued: true, width: 60, align: "right" });
-    doc.text("Precio", 380, doc.y, { continued: true, width: 70, align: "right" });
-    doc.text("Total", 450, doc.y, { width: 90, align: "right" });
-    doc.moveDown(0.3);
-    doc.text("".padEnd(90, "-"));
-    doc.moveDown(0.3);
-
-    let grandValue = 0;
-
-    for (const r of rows) {
-        const qty = Number(r.quantity);
-        const price = Number(r.price);
-        const lineTotal = qty * price;
-        grandValue += lineTotal;
-
-        doc.text(r.name, 40, doc.y, { continued: true, width: 220 });
-        doc.text(String(r.gramaje), 260, doc.y, { continued: true, width: 60, align: "right" });
-        doc.text(String(qty), 320, doc.y, { continued: true, width: 60, align: "right" });
-        doc.text(price.toFixed(2), 380, doc.y, { continued: true, width: 70, align: "right" });
-        doc.text(lineTotal.toFixed(2), 450, doc.y, { width: 90, align: "right" });
-
-        if (doc.y > 740) doc.addPage();
-    }
-
-    doc.moveDown(1);
-    doc.text("".padEnd(90, "-"));
-    doc.moveDown(0.5);
-    doc.fontSize(11).text(`Valor total estimado (stock * precio): ${grandValue.toFixed(2)}`, { align: "right" });
-
-    doc.end();
-    },
-
-    // ====== NUEVO: GASTOS PDF (rango) ======
+    // =========================
+    // GASTOS: PDF
+    // =========================
     async streamExpensesPdf({ from, to, categoryId, includeInactive, res }) {
-        const { from: f, to: t } = toDateRange({ from, to });
-        const rows = await reportsRepo.expensesRows({ from: f, to: t, categoryId, includeInactive });
-        const summary = await reportsRepo.expensesSummaryByCategory({ from: f, to: t, includeInactive });
-
+        const rows = await reportsRepo.expensesRows({ from, to, categoryId, includeInactive });
+        const summary = await reportsRepo.expensesSummaryByCategory({ from, to, includeInactive });
         const total = rows.reduce((acc, r) => acc + Number(r.amount), 0);
 
         res.setHeader("Content-Type", "application/pdf");
@@ -337,11 +236,9 @@
         doc.fontSize(12).text(`Total gastos: ${total.toFixed(2)}`);
         doc.moveDown(1);
 
-        // Resumen por categoría
         doc.fontSize(12).text("Resumen por categoría", { underline: true });
         doc.moveDown(0.5);
         doc.fontSize(10);
-
         for (const s of summary) {
         doc.text(`${s.category_name}: ${Number(s.total_amount).toFixed(2)}  (${s.count_expenses} registros)`);
         }
@@ -350,7 +247,6 @@
         doc.fontSize(12).text("Detalle", { underline: true });
         doc.moveDown(0.5);
 
-        // Encabezado simple
         doc.fontSize(10);
         doc.text("Fecha", 40, doc.y, { continued: true, width: 80 });
         doc.text("Categoría", 120, doc.y, { continued: true, width: 120 });
@@ -367,8 +263,575 @@
         doc.text(r.title, 240, doc.y, { continued: true, width: 200 });
         doc.text(Number(r.amount).toFixed(2), 440, doc.y, { width: 100, align: "right" });
 
-        // salto de página si hace falta
         if (doc.y > 740) doc.addPage();
+        }
+
+        doc.end();
+    },
+
+    // =========================
+    // INVENTARIO: Excel
+    // =========================
+    async buildInventoryExcel({ warehouseId }) {
+        const rows = await reportsRepo.inventoryStockRows({ warehouseId });
+        const totals = await reportsRepo.inventoryTotals({ warehouseId });
+
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "Arena System";
+
+        const ws = wb.addWorksheet("Inventario");
+        ws.columns = [
+        { header: "Producto ID", key: "product_id", width: 12 },
+        { header: "Producto", key: "name", width: 20 },
+        { header: "Gramaje", key: "gramaje", width: 10 },
+        { header: "Unidad", key: "unit", width: 10 },
+        { header: "Precio", key: "price", width: 12 },
+        { header: "Cantidad", key: "quantity", width: 12 }
+        ];
+        ws.getRow(1).font = { bold: true };
+
+        for (const r of rows) {
+        ws.addRow({
+            product_id: r.product_id,
+            name: r.name,
+            gramaje: r.gramaje,
+            unit: r.unit,
+            price: Number(r.price),
+            quantity: Number(r.quantity)
+        });
+        }
+
+        const wsSum = wb.addWorksheet("Resumen");
+        wsSum.columns = [
+        { header: "Métrica", key: "metric", width: 24 },
+        { header: "Valor", key: "value", width: 18 }
+        ];
+        wsSum.getRow(1).font = { bold: true };
+
+        wsSum.addRow({ metric: "Bodega ID", value: warehouseId });
+        wsSum.addRow({ metric: "Total productos activos", value: Number(totals.total_products) });
+        wsSum.addRow({ metric: "Total unidades (bultos)", value: Number(totals.total_units) });
+
+        return await wb.xlsx.writeBuffer();
+    },
+
+    // =========================
+    // INVENTARIO: PDF
+    // =========================
+    async streamInventoryPdf({ warehouseId, res }) {
+        const rows = await reportsRepo.inventoryStockRows({ warehouseId });
+        const totals = await reportsRepo.inventoryTotals({ warehouseId });
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="inventario_bodega-${warehouseId}.pdf"`);
+
+        const doc = new PDFDocument({ margin: 40 });
+        doc.pipe(res);
+
+        doc.fontSize(18).text("REPORTE DE INVENTARIO", { align: "center" });
+        doc.moveDown(0.5);
+
+        doc.fontSize(11).text(`Bodega ID: ${warehouseId}`);
+        doc.text(`Total productos activos: ${Number(totals.total_products)}`);
+        doc.text(`Total unidades (bultos): ${Number(totals.total_units)}`);
+        doc.moveDown(1);
+
+        doc.fontSize(12).text("Stock actual", { underline: true });
+        doc.moveDown(0.5);
+
+        doc.fontSize(10);
+        doc.text("Producto", 40, doc.y, { continued: true, width: 220 });
+        doc.text("Gramaje", 260, doc.y, { continued: true, width: 60, align: "right" });
+        doc.text("Cant", 320, doc.y, { continued: true, width: 60, align: "right" });
+        doc.text("Precio", 380, doc.y, { continued: true, width: 70, align: "right" });
+        doc.text("Total", 450, doc.y, { width: 90, align: "right" });
+        doc.moveDown(0.3);
+        doc.text("".padEnd(90, "-"));
+        doc.moveDown(0.3);
+
+        let grandValue = 0;
+
+        for (const r of rows) {
+        const qty = Number(r.quantity);
+        const price = Number(r.price);
+        const lineTotal = qty * price;
+        grandValue += lineTotal;
+
+        doc.text(r.name, 40, doc.y, { continued: true, width: 220 });
+        doc.text(String(r.gramaje), 260, doc.y, { continued: true, width: 60, align: "right" });
+        doc.text(String(qty), 320, doc.y, { continued: true, width: 60, align: "right" });
+        doc.text(price.toFixed(2), 380, doc.y, { continued: true, width: 70, align: "right" });
+        doc.text(lineTotal.toFixed(2), 450, doc.y, { width: 90, align: "right" });
+
+        if (doc.y > 740) doc.addPage();
+        }
+
+        doc.moveDown(1);
+        doc.text("".padEnd(90, "-"));
+        doc.moveDown(0.5);
+        doc.fontSize(11).text(`Valor total estimado (stock * precio): ${grandValue.toFixed(2)}`, { align: "right" });
+
+        doc.end();
+    },
+
+    // =========================
+    // NÓMINA: Excel
+    // =========================
+    async buildPayrollExcel({ runId }) {
+        const header = await reportsRepo.payrollRunHeader(runId);
+        if (!header) throw httpError(404, "Nómina no encontrada");
+
+        const items = await reportsRepo.payrollRunItems(runId);
+        const deductions = await reportsRepo.payrollRunDeductions(runId);
+
+        const totalGross = items.reduce((a, r) => a + Number(r.gross_amount), 0);
+        const totalDed = items.reduce((a, r) => a + Number(r.total_deductions), 0);
+        const totalNet = items.reduce((a, r) => a + Number(r.net_amount), 0);
+
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "Arena System";
+
+        const wsSum = wb.addWorksheet("Resumen");
+        wsSum.columns = [
+        { header: "Campo", key: "k", width: 22 },
+        { header: "Valor", key: "v", width: 40 }
+        ];
+        wsSum.getRow(1).font = { bold: true };
+        wsSum.addRow({ k: "Payroll Run ID", v: header.id });
+        wsSum.addRow({ k: "Periodo desde", v: String(header.period_from) });
+        wsSum.addRow({ k: "Periodo hasta", v: String(header.period_to) });
+        wsSum.addRow({ k: "Nota", v: header.note ?? "" });
+        wsSum.addRow({ k: "Total bruto", v: totalGross });
+        wsSum.addRow({ k: "Total descuentos", v: totalDed });
+        wsSum.addRow({ k: "Total neto", v: totalNet });
+
+        const ws = wb.addWorksheet("Nomina");
+        ws.columns = [
+        { header: "Empleado", key: "employee_name", width: 26 },
+        { header: "Bruto", key: "gross_amount", width: 12 },
+        { header: "Descuentos", key: "total_deductions", width: 12 },
+        { header: "Neto", key: "net_amount", width: 12 }
+        ];
+        ws.getRow(1).font = { bold: true };
+
+        for (const r of items) {
+        ws.addRow({
+            employee_name: r.employee_name,
+            gross_amount: Number(r.gross_amount),
+            total_deductions: Number(r.total_deductions),
+            net_amount: Number(r.net_amount)
+        });
+        }
+
+        const wsD = wb.addWorksheet("Descuentos");
+        wsD.columns = [
+        { header: "Empleado", key: "employee_name", width: 26 },
+        { header: "Debt ID", key: "debt_id", width: 10 },
+        { header: "Tipo", key: "debt_type", width: 12 },
+        { header: "Monto descontado", key: "amount", width: 16 },
+        { header: "Saldo deuda (ahora)", key: "debt_balance_now", width: 16 },
+        { header: "Estado deuda (ahora)", key: "debt_status_now", width: 16 }
+        ];
+        wsD.getRow(1).font = { bold: true };
+
+        for (const d of deductions) {
+        wsD.addRow({
+            employee_name: d.employee_name,
+            debt_id: d.debt_id,
+            debt_type: d.debt_type,
+            amount: Number(d.amount),
+            debt_balance_now: Number(d.debt_balance_now),
+            debt_status_now: d.debt_status_now
+        });
+        }
+
+        return await wb.xlsx.writeBuffer();
+    },
+
+    // =========================
+    // NÓMINA: PDF
+    // =========================
+    async streamPayrollPdf({ runId, res }) {
+        const header = await reportsRepo.payrollRunHeader(runId);
+        if (!header) throw httpError(404, "Nómina no encontrada");
+
+        const items = await reportsRepo.payrollRunItems(runId);
+        const deductions = await reportsRepo.payrollRunDeductions(runId);
+
+        const totalGross = items.reduce((a, r) => a + Number(r.gross_amount), 0);
+        const totalDed = items.reduce((a, r) => a + Number(r.total_deductions), 0);
+        const totalNet = items.reduce((a, r) => a + Number(r.net_amount), 0);
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="nomina-${runId}.pdf"`);
+
+        const doc = new PDFDocument({ margin: 40 });
+        doc.pipe(res);
+
+        doc.fontSize(18).text("REPORTE DE NÓMINA", { align: "center" });
+        doc.moveDown(0.5);
+
+        doc.fontSize(11).text(`Payroll Run #${header.id}`);
+        doc.text(`Periodo: ${String(header.period_from)} a ${String(header.period_to)}`);
+        if (header.note) doc.text(`Nota: ${header.note}`);
+        doc.moveDown(0.5);
+
+        doc.text(`Total bruto: ${totalGross.toFixed(2)}`);
+        doc.text(`Total descuentos: ${totalDed.toFixed(2)}`);
+        doc.text(`Total neto: ${totalNet.toFixed(2)}`);
+        doc.moveDown(1);
+
+        doc.fontSize(12).text("Resumen por empleado", { underline: true });
+        doc.moveDown(0.5);
+
+        doc.fontSize(10);
+        doc.text("Empleado", 40, doc.y, { continued: true, width: 240 });
+        doc.text("Bruto", 280, doc.y, { continued: true, width: 80, align: "right" });
+        doc.text("Desc", 360, doc.y, { continued: true, width: 80, align: "right" });
+        doc.text("Neto", 440, doc.y, { width: 100, align: "right" });
+        doc.moveDown(0.3);
+        doc.text("".padEnd(90, "-"));
+        doc.moveDown(0.3);
+
+        for (const r of items) {
+        doc.text(r.employee_name, 40, doc.y, { continued: true, width: 240 });
+        doc.text(Number(r.gross_amount).toFixed(2), 280, doc.y, { continued: true, width: 80, align: "right" });
+        doc.text(Number(r.total_deductions).toFixed(2), 360, doc.y, { continued: true, width: 80, align: "right" });
+        doc.text(Number(r.net_amount).toFixed(2), 440, doc.y, { width: 100, align: "right" });
+        if (doc.y > 740) doc.addPage();
+        }
+
+        doc.moveDown(1);
+        doc.fontSize(12).text("Descuentos aplicados", { underline: true });
+        doc.moveDown(0.5);
+
+        doc.fontSize(10);
+        for (const d of deductions) {
+        doc.text(
+            `${d.employee_name} -> Deuda #${d.debt_id} (${d.debt_type}) : -${Number(d.amount).toFixed(2)} | saldo ahora: ${Number(d.debt_balance_now).toFixed(2)}`
+        );
+        if (doc.y > 740) doc.addPage();
+        }
+
+        doc.end();
+    },
+
+    // =========================
+    // DEUDAS: Excel
+    // =========================
+    async buildDebtsExcel({ status, employeeId }) {
+        const rows = await reportsRepo.debtsBalances({ status, employeeId });
+
+        const totalBalance = rows.reduce((a, r) => a + Number(r.balance), 0);
+        const totalOriginal = rows.reduce((a, r) => a + Number(r.original_amount), 0);
+
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "Arena System";
+
+        const ws = wb.addWorksheet("Deudas");
+        ws.columns = [
+        { header: "Debt ID", key: "id", width: 10 },
+        { header: "Empleado", key: "employee_name", width: 26 },
+        { header: "Tipo", key: "type", width: 12 },
+        { header: "Monto inicial", key: "original_amount", width: 14 },
+        { header: "Saldo", key: "balance", width: 12 },
+        { header: "Estado", key: "status", width: 12 },
+        { header: "Nota", key: "note", width: 30 },
+        { header: "Creada", key: "created_at", width: 22 }
+        ];
+        ws.getRow(1).font = { bold: true };
+
+        for (const r of rows) {
+        ws.addRow({
+            id: r.id,
+            employee_name: r.employee_name,
+            type: r.type,
+            original_amount: Number(r.original_amount),
+            balance: Number(r.balance),
+            status: r.status,
+            note: r.note ?? "",
+            created_at: r.created_at
+        });
+        }
+
+        const wsSum = wb.addWorksheet("Resumen");
+        wsSum.columns = [
+        { header: "Métrica", key: "k", width: 22 },
+        { header: "Valor", key: "v", width: 18 }
+        ];
+        wsSum.getRow(1).font = { bold: true };
+        wsSum.addRow({ k: "Total deudas", v: rows.length });
+        wsSum.addRow({ k: "Total monto inicial", v: totalOriginal });
+        wsSum.addRow({ k: "Total saldo", v: totalBalance });
+
+        return await wb.xlsx.writeBuffer();
+    },
+
+    // =========================
+    // DEUDAS: PDF
+    // =========================
+    async streamDebtsPdf({ status, employeeId, res }) {
+        const rows = await reportsRepo.debtsBalances({ status, employeeId });
+
+        const totalBalance = rows.reduce((a, r) => a + Number(r.balance), 0);
+        const totalOriginal = rows.reduce((a, r) => a + Number(r.original_amount), 0);
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="deudas.pdf"`);
+
+        const doc = new PDFDocument({ margin: 40 });
+        doc.pipe(res);
+
+        doc.fontSize(18).text("REPORTE DE DEUDAS", { align: "center" });
+        doc.moveDown(0.5);
+
+        if (status) doc.fontSize(11).text(`Filtro status: ${status}`);
+        if (employeeId) doc.fontSize(11).text(`Filtro empleadoId: ${employeeId}`);
+        doc.moveDown(0.5);
+
+        doc.fontSize(11).text(`Total monto inicial: ${totalOriginal.toFixed(2)}`);
+        doc.text(`Total saldo: ${totalBalance.toFixed(2)}`);
+        doc.moveDown(1);
+
+        doc.fontSize(10);
+        doc.text("Empleado", 40, doc.y, { continued: true, width: 220 });
+        doc.text("Tipo", 260, doc.y, { continued: true, width: 60 });
+        doc.text("Saldo", 320, doc.y, { continued: true, width: 80, align: "right" });
+        doc.text("Estado", 400, doc.y, { width: 120 });
+        doc.moveDown(0.3);
+        doc.text("".padEnd(90, "-"));
+        doc.moveDown(0.3);
+
+        for (const r of rows) {
+        doc.text(r.employee_name, 40, doc.y, { continued: true, width: 220 });
+        doc.text(r.type, 260, doc.y, { continued: true, width: 60 });
+        doc.text(Number(r.balance).toFixed(2), 320, doc.y, { continued: true, width: 80, align: "right" });
+        doc.text(r.status, 400, doc.y, { width: 120 });
+
+        if (doc.y > 740) doc.addPage();
+        }
+
+        doc.end();
+    },
+
+    // =========================
+    // KARDEX: Excel
+    // =========================
+    async buildKardexExcel({ warehouseId, productId, from, to }) {
+        const fromDT = `${from} 00:00:00`;
+        const toDT = `${to} 23:59:59`;
+
+        const all = await reportsRepo.kardexMovementsUpTo({ warehouseId, productId, toDT });
+
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "Arena System";
+
+        const wsSum = wb.addWorksheet("Resumen");
+        wsSum.columns = [
+        { header: "Campo", key: "k", width: 22 },
+        { header: "Valor", key: "v", width: 40 }
+        ];
+        wsSum.getRow(1).font = { bold: true };
+
+        const ws = wb.addWorksheet("Kardex");
+        ws.columns = [
+        { header: "Fecha", key: "created_at", width: 22 },
+        { header: "Tipo", key: "type", width: 10 },
+        { header: "Cantidad", key: "quantity", width: 10 },
+        { header: "Nota", key: "note", width: 40 },
+        { header: "Creado por", key: "created_by", width: 12 },
+        { header: "Saldo", key: "balance", width: 10 }
+        ];
+        ws.getRow(1).font = { bold: true };
+
+        wsSum.addRow({ k: "Bodega ID", v: warehouseId });
+        wsSum.addRow({ k: "Producto ID", v: productId });
+        wsSum.addRow({ k: "Rango", v: `${from} a ${to}` });
+
+        if (!all.length) {
+        wsSum.addRow({ k: "Nota", v: "Sin movimientos hasta la fecha final indicada" });
+        ws.addRow({
+            created_at: `${from} 00:00:00`,
+            type: "OPEN",
+            quantity: "",
+            note: "Saldo de apertura (sin datos)",
+            created_by: "",
+            balance: 0
+        });
+        return await wb.xlsx.writeBuffer();
+        }
+
+        const product = {
+        id: all[0].product_id,
+        name: all[0].name,
+        gramaje: all[0].gramaje,
+        unit: all[0].unit
+        };
+        wsSum.addRow({ k: "Producto", v: `${product.name} ${product.gramaje} (${product.unit})` });
+
+        let balance = 0;
+        let openingBalance = 0;
+        let totalIn = 0;
+        let totalOut = 0;
+        let totalAdjust = 0;
+
+        const rowsWithBalance = [];
+
+        for (const m of all) {
+        if (m.type === "IN") balance += Number(m.quantity);
+        else if (m.type === "OUT") balance -= Number(m.quantity);
+        else if (m.type === "ADJUST") balance = Number(m.quantity);
+
+        const ts = new Date(m.created_at).getTime();
+        const inWindow = ts >= new Date(fromDT).getTime() && ts <= new Date(toDT).getTime();
+
+        if (!inWindow) {
+            openingBalance = balance;
+            continue;
+        }
+
+        if (m.type === "IN") totalIn += Number(m.quantity);
+        if (m.type === "OUT") totalOut += Number(m.quantity);
+        if (m.type === "ADJUST") totalAdjust += 1;
+
+        rowsWithBalance.push({
+            created_at: m.created_at,
+            type: m.type,
+            quantity: Number(m.quantity),
+            note: m.note ?? "",
+            created_by: m.created_by ?? "",
+            balance
+        });
+        }
+
+        const closingBalance = rowsWithBalance.length
+        ? rowsWithBalance[rowsWithBalance.length - 1].balance
+        : openingBalance;
+
+        wsSum.addRow({ k: "Saldo apertura", v: openingBalance });
+        wsSum.addRow({ k: "Total IN", v: totalIn });
+        wsSum.addRow({ k: "Total OUT", v: totalOut });
+        wsSum.addRow({ k: "Ajustes (count)", v: totalAdjust });
+        wsSum.addRow({ k: "Saldo cierre", v: closingBalance });
+
+        ws.addRow({
+        created_at: `${from} 00:00:00`,
+        type: "OPEN",
+        quantity: "",
+        note: "Saldo de apertura",
+        created_by: "",
+        balance: openingBalance
+        });
+
+        for (const r of rowsWithBalance) ws.addRow(r);
+
+        return await wb.xlsx.writeBuffer();
+    },
+
+    // =========================
+    // KARDEX: PDF
+    // =========================
+    async streamKardexPdf({ warehouseId, productId, from, to, res }) {
+        const fromDT = `${from} 00:00:00`;
+        const toDT = `${to} 23:59:59`;
+
+        const all = await reportsRepo.kardexMovementsUpTo({ warehouseId, productId, toDT });
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+        "Content-Disposition",
+        `inline; filename="kardex_wh-${warehouseId}_prod-${productId}_${from}_a_${to}.pdf"`
+        );
+
+        const doc = new PDFDocument({ margin: 40 });
+        doc.pipe(res);
+
+        doc.fontSize(18).text("KARDEX (Movimientos)", { align: "center" });
+        doc.moveDown(0.5);
+
+        doc.fontSize(11).text(`Bodega ID: ${warehouseId}`);
+        doc.text(`Producto ID: ${productId}`);
+        doc.text(`Rango: ${from} a ${to}`);
+        doc.moveDown(0.5);
+
+        if (!all.length) {
+        doc.text("Sin movimientos hasta la fecha final indicada.");
+        doc.end();
+        return;
+        }
+
+        const product = { name: all[0].name, gramaje: all[0].gramaje, unit: all[0].unit };
+        doc.text(`Producto: ${product.name} ${product.gramaje} (${product.unit})`);
+        doc.moveDown(0.5);
+
+        let balance = 0;
+        let openingBalance = 0;
+        let totalIn = 0;
+        let totalOut = 0;
+        let totalAdjust = 0;
+
+        const rows = [];
+        for (const m of all) {
+        if (m.type === "IN") balance += Number(m.quantity);
+        else if (m.type === "OUT") balance -= Number(m.quantity);
+        else if (m.type === "ADJUST") balance = Number(m.quantity);
+
+        const ts = new Date(m.created_at).getTime();
+        const inWindow = ts >= new Date(fromDT).getTime() && ts <= new Date(toDT).getTime();
+
+        if (!inWindow) {
+            openingBalance = balance;
+            continue;
+        }
+
+        if (m.type === "IN") totalIn += Number(m.quantity);
+        if (m.type === "OUT") totalOut += Number(m.quantity);
+        if (m.type === "ADJUST") totalAdjust += 1;
+
+        rows.push({
+            created_at: m.created_at,
+            type: m.type,
+            quantity: Number(m.quantity),
+            note: m.note ?? "",
+            balance
+        });
+        }
+
+        const closingBalance = rows.length ? rows[rows.length - 1].balance : openingBalance;
+
+        doc.text(`Saldo apertura: ${openingBalance}`);
+        doc.text(`Total IN: ${totalIn} | Total OUT: ${totalOut} | Ajustes: ${totalAdjust}`);
+        doc.text(`Saldo cierre: ${closingBalance}`);
+        doc.moveDown(1);
+
+        doc.fontSize(12).text("Detalle", { underline: true });
+        doc.moveDown(0.5);
+
+        doc.fontSize(10);
+        doc.text("Fecha", 40, doc.y, { continued: true, width: 140 });
+        doc.text("Tipo", 180, doc.y, { continued: true, width: 50 });
+        doc.text("Cant", 230, doc.y, { continued: true, width: 60, align: "right" });
+        doc.text("Saldo", 290, doc.y, { continued: true, width: 60, align: "right" });
+        doc.text("Nota", 350, doc.y, { width: 190 });
+        doc.moveDown(0.3);
+        doc.text("".padEnd(90, "-"));
+        doc.moveDown(0.3);
+
+        // Apertura
+        doc.text(`${from} 00:00:00`, 40, doc.y, { continued: true, width: 140 });
+        doc.text("OPEN", 180, doc.y, { continued: true, width: 50 });
+        doc.text("-", 230, doc.y, { continued: true, width: 60, align: "right" });
+        doc.text(String(openingBalance), 290, doc.y, { continued: true, width: 60, align: "right" });
+        doc.text("Saldo de apertura", 350, doc.y, { width: 190 });
+
+        for (const r of rows) {
+        if (doc.y > 740) doc.addPage();
+
+        doc.text(String(r.created_at), 40, doc.y, { continued: true, width: 140 });
+        doc.text(r.type, 180, doc.y, { continued: true, width: 50 });
+        doc.text(String(r.quantity), 230, doc.y, { continued: true, width: 60, align: "right" });
+        doc.text(String(r.balance), 290, doc.y, { continued: true, width: 60, align: "right" });
+        doc.text(r.note, 350, doc.y, { width: 190 });
         }
 
         doc.end();
