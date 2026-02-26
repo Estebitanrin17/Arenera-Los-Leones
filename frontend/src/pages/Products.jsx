@@ -5,237 +5,303 @@
     PieChart, Pie, Cell
     } from "recharts";
 
-    import { api } from "../services/api";   // ✅ tu estructura
+    import { api } from "../services/api";
     import "./products.css";
 
     function money(n) {
-    return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP" }).format(n || 0);
+    return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP" }).format(Number(n || 0));
     }
 
-    function stockBadge(p) {
-    const st = Number(p.stock ?? 0);
-    const min = Number(p.min_stock ?? 0);
-    if (st <= 0) return { cls: "out", text: "Agotado" };
-    if (min > 0 && st <= min) return { cls: "low", text: "Bajo" };
+    function badgeForQty(qty) {
+    const q = Number(qty || 0);
+    if (q <= 0) return { cls: "bad", text: "Agotado" };
+    if (q <= 5) return { cls: "warn", text: "Bajo" };
     return { cls: "ok", text: "OK" };
     }
 
     export default function Products() {
-    const [products, setProducts] = useState([]);
+    const [warehouseId, setWarehouseId] = useState(1);
+    const [rows, setRows] = useState([]); // productos + stock mergeado
+
     const [q, setQ] = useState("");
-    const [onlyLow, setOnlyLow] = useState(false);
+    const [onlyInStock, setOnlyInStock] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [err, setErr] = useState("");
+
+    // descarga de reportes con Authorization (porque abrir pestaña no manda headers)
+    const downloadFile = async (path, fallbackName) => {
+        setErr("");
+        try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`http://localhost:3000/api${path}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error(await res.text());
+
+        const blob = await res.blob();
+        const cd = res.headers.get("content-disposition") || "";
+        const match = /filename="([^"]+)"/.exec(cd);
+        const filename = match?.[1] || fallbackName || "reporte";
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        } catch (e) {
+        setErr(e?.message || "Error descargando");
+        }
+    };
+
+    const exportExcel = () =>
+        downloadFile(`/reports/inventory.xlsx?warehouseId=${warehouseId}`, `inventario_bodega-${warehouseId}.xlsx`);
+
+    const exportPdf = () =>
+        downloadFile(`/reports/inventory.pdf?warehouseId=${warehouseId}`, `inventario_bodega-${warehouseId}.pdf`);
+
+    async function load() {
+        setErr("");
+        setLoading(true);
+        try {
+        // ✅ 1) Productos (catálogo)
+        const pRes = await api.get("/products", { params: { all: 1 } });
+        const products = pRes.data?.data || [];
+
+        // ✅ 2) Stock por bodega (cantidades)
+        // Nota: este endpoint devuelve: product_id, name, gramaje, unit, quantity
+        const sRes = await api.get("/inventory/stock", { params: { warehouseId } });
+        const stock = sRes.data?.data || [];
+
+        const stockMap = new Map(stock.map((s) => [Number(s.product_id), Number(s.quantity || 0)]));
+
+        // ✅ Merge: producto + quantity
+        const merged = products.map((p) => ({
+            product_id: p.id,
+            name: p.name,
+            gramaje: p.gramaje,
+            unit: p.unit,
+            price: Number(p.price || 0),
+            is_active: Number(p.is_active || 0),
+            quantity: stockMap.get(Number(p.id)) ?? 0
+        }));
+
+        setRows(merged);
+        } catch (e) {
+        console.error(e);
+        setErr(e?.response?.data?.message || e?.message || "Error cargando datos");
+        setRows([]);
+        } finally {
+        setLoading(false);
+        }
+    }
 
     useEffect(() => {
-        let alive = true;
-        (async () => {
-        try {
-            setLoading(true);
-            const data = await api("/api/products"); // <- si tu backend usa /api/products
-            const rows = Array.isArray(data) ? data : (data?.rows || []);
-            if (alive) setProducts(rows);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            if (alive) setLoading(false);
-        }
-        })();
-        return () => { alive = false; };
-    }, []);
+        load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [warehouseId]);
 
     const filtered = useMemo(() => {
         const s = q.trim().toLowerCase();
-        return products.filter((p) => {
-        const name = (p.name || p.nombre || "").toLowerCase();
-        const sku = (p.sku || "").toLowerCase();
-        const cat = (p.category_name || p.category || "").toLowerCase();
-
-        const hit = !s || name.includes(s) || sku.includes(s) || cat.includes(s);
+        return rows.filter((r) => {
+        const label = `${r.name || ""} ${r.gramaje || ""}${r.unit || ""}`.toLowerCase();
+        const hit = !s || label.includes(s);
         if (!hit) return false;
-        if (!onlyLow) return true;
-
-        const st = Number(p.stock ?? 0);
-        const min = Number(p.min_stock ?? 0);
-        return st <= 0 || (min > 0 && st <= min);
+        if (!onlyInStock) return true;
+        return Number(r.quantity || 0) > 0;
         });
-    }, [products, q, onlyLow]);
+    }, [rows, q, onlyInStock]);
 
     const kpis = useMemo(() => {
-        const total = products.length;
-        let low = 0, out = 0, units = 0, valueCost = 0;
+        const activeProducts = rows.reduce((a, r) => a + (r.is_active ? 1 : 0), 0);
+        const totalUnits = rows.reduce((a, r) => a + Number(r.quantity || 0), 0);
+        const out = rows.reduce((a, r) => a + (Number(r.quantity || 0) <= 0 ? 1 : 0), 0);
+        const value = rows.reduce((a, r) => a + Number(r.quantity || 0) * Number(r.price || 0), 0);
+        return { activeProducts, totalUnits, out, value };
+    }, [rows]);
 
-        for (const p of products) {
-        const st = Number(p.stock ?? 0);
-        const min = Number(p.min_stock ?? 0);
-        units += st;
-        valueCost += st * Number(p.cost ?? 0);
+    const topByQty = useMemo(() => {
+        return [...rows]
+        .filter((r) => r.is_active)
+        .sort((a, b) => Number(b.quantity || 0) - Number(a.quantity || 0))
+        .slice(0, 10)
+        .map((r) => ({
+            name: `${r.name} ${r.gramaje}${r.unit}`,
+            qty: Number(r.quantity || 0),
+        }));
+    }, [rows]);
 
-        if (st <= 0) out++;
-        else if (min > 0 && st <= min) low++;
+    const stockPie = useMemo(() => {
+        let ok = 0, low = 0, out = 0;
+        for (const r of rows.filter(x => x.is_active)) {
+        const q = Number(r.quantity || 0);
+        if (q <= 0) out++;
+        else if (q <= 5) low++;
+        else ok++;
         }
-        return { total, low, out, units, valueCost };
-    }, [products]);
-
-    const topCategories = useMemo(() => {
-        const map = new Map();
-        for (const p of products) {
-        const c = p.category_name || p.category || "Sin categoría";
-        map.set(c, (map.get(c) || 0) + 1);
-        }
-        return [...map.entries()]
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 6);
-    }, [products]);
-
-    const stockStatusPie = useMemo(() => {
-        const ok = Math.max(kpis.total - kpis.low - kpis.out, 0);
         return [
         { name: "OK", value: ok },
-        { name: "Bajo", value: kpis.low },
-        { name: "Agotado", value: kpis.out },
+        { name: "Bajo", value: low },
+        { name: "Agotado", value: out },
         ];
-    }, [kpis]);
+    }, [rows]);
 
     return (
-        <div className="products-wrap">
-        {/* Header */}
-        <div className="products-header ui-card">
-            <div className="products-title">
-            <h1>Productos</h1>
-            <p>Catálogo + señales de reposición (enfoque empresarial).</p>
+        <div className="page">
+        <div className="header">
+            <div>
+            <h1 className="title">Productos</h1>
+            <div className="sub">
+                Catálogo + Stock (bodega) · KPIs + gráficas
+            </div>
             </div>
 
-            <div className="products-actions">
-            <button className="ui-btn ui-btn--primary">+ Nuevo</button>
-            <button className="ui-btn">Excel</button>
-            <button className="ui-btn">PDF</button>
+            <div className="controls">
+            <input
+                className="input"
+                style={{ width: 260 }}
+                placeholder="Buscar producto (nombre/gramaje)…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+            />
+
+            <select
+                className="select"
+                value={warehouseId}
+                onChange={(e) => setWarehouseId(Number(e.target.value))}
+            >
+                <option value={1}>Bodega 1</option>
+                <option value={2}>Bodega 2</option>
+            </select>
+
+            <label style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--muted)", fontSize: 12 }}>
+                <input type="checkbox" checked={onlyInStock} onChange={(e) => setOnlyInStock(e.target.checked)} />
+                Solo con stock
+            </label>
+
+            <button className="btn" onClick={load}>Actualizar</button>
+            <button className="btn-ghost" onClick={exportExcel}>Excel</button>
+            <button className="btn-ghost" onClick={exportPdf}>PDF</button>
             </div>
         </div>
 
+        {err ? <div className="err">{err}</div> : null}
+
         {/* KPIs */}
-        <div className="products-grid">
-            <div className="ui-card kpi">
-            <div className="label">Productos</div>
-            <div className="value">{kpis.total}</div>
-            <div className="hint">Ítems en catálogo</div>
+        <div className="grid">
+            <div className="card">
+            <h4>Productos activos</h4>
+            <p className="big">{kpis.activeProducts}</p>
+            <div className="sub">Catálogo activo</div>
             </div>
-            <div className="ui-card kpi">
-            <div className="label">Stock total</div>
-            <div className="value">{kpis.units}</div>
-            <div className="hint">Unidades en inventario</div>
+
+            <div className="card">
+            <h4>Unidades en stock</h4>
+            <p className="big">{kpis.totalUnits}</p>
+            <div className="sub">Total en bodega seleccionada</div>
             </div>
-            <div className="ui-card kpi">
-            <div className="label">Bajo mínimo</div>
-            <div className="value">{kpis.low}</div>
-            <div className="hint">Reposición recomendada</div>
+
+            <div className="card">
+            <h4>Agotados</h4>
+            <p className="big">{kpis.out}</p>
+            <div className="sub">Activos con cantidad = 0</div>
             </div>
-            <div className="ui-card kpi">
-            <div className="label">Valor stock (costo)</div>
-            <div className="value">{money(kpis.valueCost)}</div>
-            <div className="hint">Estimado por costo</div>
+
+            <div className="card">
+            <h4>Valor stock (precio)</h4>
+            <p className="big">{money(kpis.value)}</p>
+            <div className="sub">Cantidad * precio producto</div>
             </div>
         </div>
 
         {/* Charts */}
-        <div className="products-row">
-            <div className="ui-card" style={{ padding: 14 }}>
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>Productos por categoría</div>
-            <div style={{ color: "var(--muted)", fontSize: 12 }}>Top 6</div>
-
-            <div style={{ height: 260, marginTop: 10 }}>
+        <div className="split">
+            <div className="card">
+            <h4>Top 10 por cantidad</h4>
+            <div style={{ height: 280 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topCategories}>
-                    <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,.65)", fontSize: 12 }} />
-                    <YAxis tick={{ fill: "rgba(255,255,255,.65)", fontSize: 12 }} />
-                    <Tooltip contentStyle={{ background: "#0B1220", border: "1px solid rgba(255,255,255,.12)" }} />
-                    <Bar dataKey="count" fill="rgba(20,184,166,.7)" radius={[10, 10, 0, 0]} />
+                <BarChart data={topByQty}>
+                    <XAxis dataKey="name" tick={{ fill: "rgba(233,238,252,0.75)", fontSize: 11 }} />
+                    <YAxis tick={{ fill: "rgba(233,238,252,0.75)", fontSize: 11 }} />
+                    <Tooltip
+                    contentStyle={{ background: "#0b1220", border: "1px solid rgba(255,255,255,0.12)" }}
+                    labelStyle={{ color: "#e9eefc" }}
+                    />
+                    <Bar dataKey="qty" fill="var(--accent2)" radius={[10, 10, 0, 0]} />
                 </BarChart>
                 </ResponsiveContainer>
             </div>
             </div>
 
-            <div className="ui-card" style={{ padding: 14 }}>
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>Estado de stock</div>
-            <div style={{ color: "var(--muted)", fontSize: 12 }}>OK vs Bajo vs Agotado</div>
-
-            <div style={{ height: 260, marginTop: 10 }}>
+            <div className="card">
+            <h4>Distribución de stock</h4>
+            <div style={{ height: 280 }}>
                 <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                    <Pie data={stockStatusPie} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={3}>
-                    {stockStatusPie.map((e, idx) => (
+                    <Pie data={stockPie} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>
+                    {stockPie.map((e, idx) => (
                         <Cell
                         key={e.name}
-                        fill={idx === 0 ? "rgba(20,184,166,.75)" : idx === 1 ? "rgba(245,158,11,.75)" : "rgba(239,68,68,.75)"}
+                        fill={idx === 0 ? "var(--accent2)" : idx === 1 ? "var(--warn)" : "var(--danger)"}
                         />
                     ))}
                     </Pie>
-                    <Tooltip contentStyle={{ background: "#0B1220", border: "1px solid rgba(255,255,255,.12)" }} />
+                    <Tooltip
+                    contentStyle={{ background: "#0b1220", border: "1px solid rgba(255,255,255,0.12)" }}
+                    labelStyle={{ color: "#e9eefc" }}
+                    />
                 </PieChart>
                 </ResponsiveContainer>
             </div>
             </div>
         </div>
 
-        {/* Filtros + Tabla */}
-        <div className="ui-card">
-            <div className="products-filters">
-            <input
-                className="input"
-                placeholder="Buscar por nombre, SKU o categoría…"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                style={{ minWidth: 260 }}
-            />
-            <label style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--muted)", fontSize: 13 }}>
-                <input type="checkbox" checked={onlyLow} onChange={(e) => setOnlyLow(e.target.checked)} />
-                Solo bajo mínimo / agotados
-            </label>
-            </div>
+        {/* Tabla */}
+        <div className="card" style={{ marginTop: 12 }}>
+            <h4>Detalle</h4>
 
-            <div style={{ padding: 12 }}>
             {loading ? (
-                <div style={{ color: "var(--muted)" }}>Cargando…</div>
+            <div className="sub">Cargando…</div>
             ) : (
-                <table className="ui-table">
+            <table className="table">
                 <thead>
-                    <tr>
+                <tr>
                     <th>Producto</th>
-                    <th>Categoría</th>
                     <th>Precio</th>
-                    <th>Costo</th>
-                    <th>Stock</th>
+                    <th>Cantidad</th>
+                    <th>Valor</th>
                     <th>Estado</th>
-                    </tr>
+                </tr>
                 </thead>
                 <tbody>
-                    {filtered.map((p) => {
-                    const b = stockBadge(p);
+                {filtered.map((r) => {
+                    const qty = Number(r.quantity || 0);
+                    const b = badgeForQty(qty);
                     return (
-                        <tr key={p.id || p.product_id || p.sku}>
+                    <tr key={r.product_id}>
                         <td>
-                            <div style={{ fontWeight: 800 }}>{p.name || p.nombre}</div>
-                            <div style={{ color: "var(--muted)", fontSize: 12 }}>{p.sku || "—"}</div>
+                        <div style={{ fontWeight: 800, opacity: r.is_active ? 1 : 0.5 }}>
+                            {r.name} {!r.is_active ? "(inactivo)" : ""}
+                        </div>
+                        <div className="sub">{r.gramaje}{r.unit}</div>
                         </td>
-                        <td>{p.category_name || p.category || "—"}</td>
-                        <td>{money(p.price)}</td>
-                        <td>{money(p.cost)}</td>
-                        <td>{p.stock ?? 0}</td>
+                        <td>{money(r.price)}</td>
+                        <td>{qty}</td>
+                        <td>{money(qty * Number(r.price || 0))}</td>
                         <td><span className={`badge ${b.cls}`}>{b.text}</span></td>
-                        </tr>
-                    );
-                    })}
-                    {!filtered.length && (
-                    <tr>
-                        <td colSpan={6} style={{ color: "var(--muted)" }}>
-                        No hay resultados con esos filtros.
-                        </td>
                     </tr>
-                    )}
+                    );
+                })}
+                {!filtered.length && (
+                    <tr>
+                    <td colSpan={5} className="sub">No hay resultados con esos filtros.</td>
+                    </tr>
+                )}
                 </tbody>
-                </table>
+            </table>
             )}
-            </div>
         </div>
         </div>
     );
