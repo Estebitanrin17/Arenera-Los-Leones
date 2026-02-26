@@ -19,6 +19,8 @@
     PanelLeftOpen,
     Menu,
     X,
+    Sun,
+    Moon,
     } from "lucide-react";
 
     const NAV_ITEMS = [
@@ -38,16 +40,30 @@
     return parts.map((p) => p[0]?.toUpperCase()).join("") || "U";
     }
 
+    function applyTheme(nextTheme) {
+    const root = document.documentElement; // <html>
+    if (nextTheme === "light") root.setAttribute("data-theme", "light");
+    else root.removeAttribute("data-theme"); // dark = default
+    }
+
     export default function AppShell() {
     const user = getUser();
     const nav = useNavigate();
     const location = useLocation();
 
-    const [collapsed, setCollapsed] = useState(() => {
-        return localStorage.getItem("sidebar_collapsed") === "1";
-    });
+    const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar_collapsed") === "1");
     const [mobileOpen, setMobileOpen] = useState(false);
     const [q, setQ] = useState("");
+
+    // ===== THEME =====
+    const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
+
+    useEffect(() => {
+        applyTheme(theme);
+        localStorage.setItem("theme", theme);
+    }, [theme]);
+
+    const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
     useEffect(() => {
         localStorage.setItem("sidebar_collapsed", collapsed ? "1" : "0");
@@ -69,25 +85,15 @@
         return NAV_ITEMS.filter((it) => it.label.toLowerCase().includes(s));
     }, [q]);
 
-    const linkClass = ({ isActive }) =>
-        `sb-link ${isActive ? "sb-link--active" : ""}`;
+    const linkClass = ({ isActive }) => `sb-link ${isActive ? "sb-link--active" : ""}`;
 
     return (
         <div className="app-shell">
         {/* Overlay (mobile drawer) */}
-        <div
-            className={`sb-overlay ${mobileOpen ? "sb-overlay--open" : ""}`}
-            onClick={() => setMobileOpen(false)}
-        />
+        <div className={`sb-overlay ${mobileOpen ? "sb-overlay--open" : ""}`} onClick={() => setMobileOpen(false)} />
 
         {/* Sidebar */}
-        <aside
-            className={[
-            "sidebar",
-            collapsed ? "sidebar--collapsed" : "",
-            mobileOpen ? "sidebar--open" : "",
-            ].join(" ")}
-        >
+        <aside className={["sidebar", collapsed ? "sidebar--collapsed" : "", mobileOpen ? "sidebar--open" : ""].join(" ")}>
             <div className="sb-top">
             <div className="sb-brand">
                 <div className="sb-avatar" aria-hidden="true">
@@ -99,8 +105,7 @@
                 <div className="sb-brand__text">
                     <div className="sb-title">Arena System</div>
                     <div className="sb-subtitle">
-                    {user?.fullName || "Usuario"} ·{" "}
-                    <span className="sb-role">{user?.role || "Rol"}</span>
+                    {user?.fullName || "Usuario"} · <span className="sb-role">{user?.role || "Rol"}</span>
                     </div>
                 </div>
                 )}
@@ -164,9 +169,7 @@
                 );
             })}
 
-            {!filteredItems.length && (
-                <div className="sb-empty">Sin resultados</div>
-            )}
+            {!filteredItems.length && <div className="sb-empty">Sin resultados</div>}
             </nav>
 
             {/* Footer */}
@@ -201,9 +204,18 @@
             <div className="topbar__title">Panel</div>
 
             <div className="topbar__right">
-                <span className="topbar__user">
-                {user?.fullName || "Usuario"}
-                </span>
+                {/* Toggle Theme */}
+                <button
+                className="icon-btn"
+                onClick={toggleTheme}
+                type="button"
+                title={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+                aria-label="Cambiar tema"
+                >
+                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+                </button>
+
+                <span className="topbar__user">{user?.fullName || "Usuario"}</span>
             </div>
             </header>
 
