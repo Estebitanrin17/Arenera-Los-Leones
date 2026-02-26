@@ -15,10 +15,6 @@
     font-family: system-ui;
     color: var(--text);
     min-height: 100vh;
-    background:
-        radial-gradient(1000px 500px at 10% 10%, rgba(77,163,255,0.18), transparent 55%),
-        radial-gradient(900px 500px at 90% 20%, rgba(78,227,193,0.14), transparent 55%),
-        linear-gradient(180deg, #0b1220, #070b14);
     padding: 18px;
     }
 
@@ -147,3 +143,26 @@
 
     .err{ color: var(--danger); margin-bottom: 10px; }
     .okmsg{ color: var(--accent2); margin-bottom: 10px; }
+
+
+        /* Select (el campo) */
+    .select{
+    color: rgba(255,255,255,.92);       /* texto del select */
+    background: rgba(255,255,255,.06);  /* fondo del select */
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px;
+    padding: 10px 12px;
+    outline: none;
+    }
+
+    /* Opciones desplegadas (muy importante) */
+    .select option{
+    color: #111 !important;     /* texto NEGRO para que se vea */
+    background: #fff !important;/* fondo BLANCO */
+    }
+
+    /* Si usas optgroup también */
+    .select optgroup{
+    color: #111 !important;
+    background: #fff !important;
+    }

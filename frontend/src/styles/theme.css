@@ -154,3 +154,208 @@
     @media(max-width: 980px){
     .split{ grid-template-columns: 1fr; }
     }
+
+            /* ================================
+    FIX SELECT / DROPDOWN (tema dark)
+    Aplica a Inventory y en general
+    ================================ */
+
+    /* 1) El campo select (cerrado) */
+    .inv-input[type="date"],
+    .inv-input[type="text"],
+    .inv-input[type="number"],
+    .inv-input,
+    .select,
+    select.inv-input,
+    select.select{
+    color: rgba(255,255,255,.92) !important;
+    background: rgba(255,255,255,.06) !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    border-radius: 12px;
+    outline: none;
+    }
+
+    /* 2) Forzar el estilo de las opciones del dropdown */
+    .inv-input option,
+    .select option,
+    select option{
+    color: #111 !important;      /* texto visible */
+    background: #fff !important; /* fondo claro */
+    }
+
+    /* Si usas optgroup */
+    .inv-input optgroup,
+    .select optgroup,
+    select optgroup{
+    color: #111 !important;
+    background: #fff !important;
+    font-weight: 800;
+    }
+
+    /* 3) Mejoras de consistencia en controles nativos */
+    .inv-input,
+    .select,
+    select.inv-input,
+    select.select{
+    -webkit-appearance: none;
+    appearance: none;
+    padding-right: 40px; /* espacio para la flecha */
+    line-height: 1.2;
+    }
+
+    /* 4) Flecha personalizada (para select) */
+    select.inv-input,
+    select.select{
+    background-image:
+        linear-gradient(45deg, transparent 50%, rgba(255,255,255,.75) 50%),
+        linear-gradient(135deg, rgba(255,255,255,.75) 50%, transparent 50%);
+    background-position:
+        calc(100% - 18px) calc(1em + 2px),
+        calc(100% - 12px) calc(1em + 2px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    }
+
+    /* 5) Focus bonito */
+    .inv-input:focus,
+    .select:focus,
+    select.inv-input:focus,
+    select.select:focus{
+    border-color: rgba(255,255,255,.22) !important;
+    box-shadow: 0 0 0 4px rgba(59,130,246,.16) !important;
+    background: rgba(255,255,255,.08) !important;
+    }
+
+    /* 6) Disabled (por si lo usas) */
+    .inv-input:disabled,
+    .select:disabled,
+    select.inv-input:disabled,
+    select.select:disabled{
+    opacity: .6;
+    cursor: not-allowed;
+    }
+
+    /* 7) Esto ayuda al navegador a elegir mejor colores de controles */
+    :root{
+    color-scheme: dark;
+    }
+
+    /* PERO: el dropdown de opciones lo dejamos claro (arriba) para asegurar visibilidad */
+
+    /* 8) BONUS: si quieres dropdown OSCURO en lugar de blanco, cambia a este bloque:
+    .inv-input option,
+    .select option,
+    select option{
+    color: #f3f4f6 !important;
+    background: #0b1220 !important;
+    }
+    .inv-input optgroup,
+    .select optgroup,
+    select optgroup{
+    color: #f3f4f6 !important;
+    background: #0b1220 !important;
+    }
+    */
+
+
+        /* ================================
+    THEME SWITCH (dark / light)
+    ================================ */
+
+    /* Default (ya lo tienes): dark */
+    :root{
+    color-scheme: dark;
+    }
+
+    /* Tema claro */
+    :root[data-theme="light"]{
+    color-scheme: light;
+
+    --bg: #f6f8ff;
+    --panel: rgba(0,0,0,0.04);
+    --panel2: rgba(0,0,0,0.06);
+    --border: rgba(0,0,0,0.10);
+
+    --text: #0b1220;
+    --muted: rgba(11,18,32,0.62);
+
+    --accent: #2563eb;
+    --accent2: #0ea5a4;
+    --danger: #dc2626;
+    --warn: #d97706;
+    }
+
+    /* Fondo global cambia según tema */
+    body{
+    background:
+        radial-gradient(1000px 500px at 10% 10%, rgba(77,163,255,0.18), transparent 55%),
+        radial-gradient(900px 500px at 90% 20%, rgba(78,227,193,0.14), transparent 55%),
+        linear-gradient(180deg, #0b1220, #070b14);
+    }
+
+    /* Fondo en tema claro */
+    :root[data-theme="light"] body{
+    background:
+        radial-gradient(1000px 500px at 10% 10%, rgba(37,99,235,0.12), transparent 55%),
+        radial-gradient(900px 500px at 90% 20%, rgba(14,165,164,0.10), transparent 55%),
+        linear-gradient(180deg, #f6f8ff, #eef2ff);
+    }
+
+    /* Inputs/Selects globales ya dependen de variables */
+    .input, .select{
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--border);
+    color: var(--text);
+    }
+
+    /* Placeholder en light */
+    :root[data-theme="light"] .input::placeholder{
+    color: rgba(11,18,32,0.45);
+    }
+
+    /* ================================
+    FIX SELECT / DROPDOWN (ambos temas)
+    ================================ */
+
+    /* Select field */
+    .select,
+    select.select,
+    .inv-input,
+    select.inv-input{
+    color: var(--text) !important;
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid var(--border) !important;
+    -webkit-appearance: none;
+    appearance: none;
+    padding-right: 40px;
+    line-height: 1.2;
+    }
+
+    /* Flecha custom (se ve en ambos temas) */
+    select.select,
+    select.inv-input{
+    background-image:
+        linear-gradient(45deg, transparent 50%, currentColor 50%),
+        linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position:
+        calc(100% - 18px) calc(1em + 2px),
+        calc(100% - 12px) calc(1em + 2px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    }
+
+    /* Dropdown options (lo más estable cross-browser) */
+    .select option,
+    .inv-input option,
+    select option{
+    color: #111 !important;
+    background: #fff !important;
+    }
+
+    /* En tema claro también queda bien (mismo dropdown blanco) */
+    :root[data-theme="light"] .select option,
+    :root[data-theme="light"] .inv-input option,
+    :root[data-theme="light"] select option{
+    color: #111 !important;
+    background: #fff !important;
+    }
