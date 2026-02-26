@@ -4,8 +4,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import Products from "./pages/Products";
 import Inventory from "./pages/Inventory";
+import Products from "./pages/Products";
 import Sales from "./pages/Sales";
 import Expenses from "./pages/Expenses";
 import Employees from "./pages/Employees";
@@ -35,8 +35,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="products" element={<Products />} />
           <Route path="inventory" element={<Inventory />} />
+          <Route path="products" element={<Products />} />
           <Route path="sales" element={<Sales />} />
           <Route path="expenses" element={<Expenses />} />
           <Route path="employees" element={<Employees />} />

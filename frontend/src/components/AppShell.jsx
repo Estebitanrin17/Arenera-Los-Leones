@@ -1,55 +1,212 @@
-    import { NavLink, Outlet, useNavigate } from "react-router-dom";
+    import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+    import { useEffect, useMemo, useState } from "react";
     import { getUser, logout } from "../services/auth";
+    import "./appShell.css";
+
+    import {
+    LayoutDashboard,
+    Package,
+    Boxes,
+    ShoppingCart,
+    Receipt,
+    Users,
+    HandCoins,
+    Wallet,
+    FileText,
+    LogOut,
+    Search,
+    PanelLeftClose,
+    PanelLeftOpen,
+    Menu,
+    X,
+    } from "lucide-react";
+
+    const NAV_ITEMS = [
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/inventory", label: "Inventario", icon: Boxes },
+    { to: "/products", label: "Productos", icon: Package },
+    { to: "/sales", label: "Ventas", icon: ShoppingCart },
+    { to: "/expenses", label: "Gastos", icon: Receipt },
+    { to: "/employees", label: "Empleados", icon: Users },
+    { to: "/debts", label: "Deudas", icon: HandCoins },
+    { to: "/payroll", label: "Nómina", icon: Wallet },
+    { to: "/reports", label: "Reportes", icon: FileText },
+    ];
+
+    function initials(name = "") {
+    const parts = name.trim().split(/\s+/).slice(0, 2);
+    return parts.map((p) => p[0]?.toUpperCase()).join("") || "U";
+    }
 
     export default function AppShell() {
     const user = getUser();
     const nav = useNavigate();
+    const location = useLocation();
 
-    const linkStyle = ({ isActive }) => ({
-        display: "block",
-        padding: "10px 12px",
-        textDecoration: "none",
-        color: isActive ? "white" : "black",
-        background: isActive ? "black" : "transparent",
-        borderRadius: 6,
-        marginBottom: 6
+    const [collapsed, setCollapsed] = useState(() => {
+        return localStorage.getItem("sidebar_collapsed") === "1";
     });
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const [q, setQ] = useState("");
+
+    useEffect(() => {
+        localStorage.setItem("sidebar_collapsed", collapsed ? "1" : "0");
+    }, [collapsed]);
+
+    // Cierra drawer al cambiar de ruta
+    useEffect(() => {
+        setMobileOpen(false);
+    }, [location.pathname]);
 
     const onLogout = () => {
         logout();
         nav("/login");
     };
 
+    const filteredItems = useMemo(() => {
+        const s = q.trim().toLowerCase();
+        if (!s) return NAV_ITEMS;
+        return NAV_ITEMS.filter((it) => it.label.toLowerCase().includes(s));
+    }, [q]);
+
+    const linkClass = ({ isActive }) =>
+        `sb-link ${isActive ? "sb-link--active" : ""}`;
+
     return (
-        <div style={{ display: "flex", minHeight: "100vh", fontFamily: "system-ui" }}>
+        <div className="app-shell">
+        {/* Overlay (mobile drawer) */}
+        <div
+            className={`sb-overlay ${mobileOpen ? "sb-overlay--open" : ""}`}
+            onClick={() => setMobileOpen(false)}
+        />
+
         {/* Sidebar */}
-        <aside style={{ width: 220, borderRight: "1px solid #ddd", padding: 12 }}>
-            <div style={{ marginBottom: 12 }}>
-            <b>Arena System</b>
-            <div style={{ fontSize: 12, marginTop: 6 }}>
-                {user?.fullName} — {user?.role}
+        <aside
+            className={[
+            "sidebar",
+            collapsed ? "sidebar--collapsed" : "",
+            mobileOpen ? "sidebar--open" : "",
+            ].join(" ")}
+        >
+            <div className="sb-top">
+            <div className="sb-brand">
+                <div className="sb-avatar" aria-hidden="true">
+                {initials(user?.fullName)}
+                <span className="sb-status" title="Activo" />
+                </div>
+
+                {!collapsed && (
+                <div className="sb-brand__text">
+                    <div className="sb-title">Arena System</div>
+                    <div className="sb-subtitle">
+                    {user?.fullName || "Usuario"} ·{" "}
+                    <span className="sb-role">{user?.role || "Rol"}</span>
+                    </div>
+                </div>
+                )}
+            </div>
+
+            <div className="sb-top__actions">
+                <button
+                className="icon-btn mobile-only"
+                onClick={() => setMobileOpen(false)}
+                title="Cerrar"
+                aria-label="Cerrar menú"
+                type="button"
+                >
+                <X size={18} />
+                </button>
+
+                <button
+                className="icon-btn"
+                onClick={() => setCollapsed((v) => !v)}
+                title={collapsed ? "Expandir" : "Colapsar"}
+                aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
+                type="button"
+                >
+                {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+                </button>
             </div>
             </div>
 
-            <nav>
-            <NavLink to="/dashboard" style={linkStyle}>Dashboard</NavLink>
-            <NavLink to="/products" style={linkStyle}>Productos</NavLink>
-            <NavLink to="/inventory" style={linkStyle}>Inventario</NavLink>
-            <NavLink to="/sales" style={linkStyle}>Ventas</NavLink>
-            <NavLink to="/expenses" style={linkStyle}>Gastos</NavLink>
-            <NavLink to="/employees" style={linkStyle}>Empleados</NavLink>
-            <NavLink to="/debts" style={linkStyle}>Deudas</NavLink>
-            <NavLink to="/payroll" style={linkStyle}>Nómina</NavLink>
-            <NavLink to="/reports" style={linkStyle}>Reportes</NavLink>
+            {/* Search */}
+            <div className="sb-search">
+            <Search size={16} className="sb-search__icon" />
+            <input
+                className="sb-search__input"
+                placeholder={collapsed ? "Buscar" : "Buscar módulo..."}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+            />
+            </div>
+
+            {/* Nav */}
+            <nav className="sb-nav">
+            {filteredItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={linkClass}
+                    data-tooltip={item.label}
+                    aria-label={item.label}
+                    title={collapsed ? item.label : undefined}
+                >
+                    <span className="sb-link__left">
+                    <span className="sb-ico">
+                        <Icon size={18} />
+                    </span>
+                    <span className="sb-label">{item.label}</span>
+                    </span>
+                    <span className="sb-dot" />
+                </NavLink>
+                );
+            })}
+
+            {!filteredItems.length && (
+                <div className="sb-empty">Sin resultados</div>
+            )}
             </nav>
 
-            <button onClick={onLogout} style={{ marginTop: 12, padding: 10, width: "100%", cursor: "pointer" }}>
-            Cerrar sesión
+            {/* Footer */}
+            <div className="sb-footer">
+            <button className="sb-logout" onClick={onLogout} type="button">
+                <LogOut size={18} />
+                <span className="sb-label">Cerrar sesión</span>
             </button>
+
+            {!collapsed && (
+                <div className="sb-footnote">
+                <span className="sb-footnote__pill">v1.0</span>
+                <span className="sb-footnote__muted">Arenera Los Leones</span>
+                </div>
+            )}
+            </div>
         </aside>
 
-        {/* Contenido */}
-        <main style={{ flex: 1, padding: 16 }}>
+        {/* Main */}
+        <main className="app-main">
+            <header className="topbar">
+            <button
+                className="icon-btn mobile-only"
+                onClick={() => setMobileOpen(true)}
+                title="Menú"
+                aria-label="Abrir menú"
+                type="button"
+            >
+                <Menu size={18} />
+            </button>
+
+            <div className="topbar__title">Panel</div>
+
+            <div className="topbar__right">
+                <span className="topbar__user">
+                {user?.fullName || "Usuario"}
+                </span>
+            </div>
+            </header>
+
             <Outlet />
         </main>
         </div>
