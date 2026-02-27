@@ -9,7 +9,11 @@
     --accent2: #4ee3c1;
     --danger: #ff6b6b;
     --warn: #ffcc66;
-
+    --rowBorder: rgba(255,255,255,0.08);
+    --controlBg: rgba(255,255,255,0.08);
+    --badgeBg: rgba(255,255,255,0.05);
+    --shadowSoft: 0 18px 60px rgba(0,0,0,.18);
+    --color-scheme: dark;
     --radius: 14px;
     }
 
@@ -272,9 +276,9 @@
     color-scheme: light;
 
     --bg: #f6f8ff;
-    --panel: rgba(0,0,0,0.04);
-    --panel2: rgba(0,0,0,0.06);
-    --border: rgba(0,0,0,0.10);
+    --panel: rgba(11,18,32,0.04);
+    --panel2: rgba(11,18,32,0.06);
+    --border: rgba(11,18,32,0.12);
 
     --text: #0b1220;
     --muted: rgba(11,18,32,0.62);
@@ -283,6 +287,11 @@
     --accent2: #0ea5a4;
     --danger: #dc2626;
     --warn: #d97706;
+
+    --rowBorder: rgba(11,18,32,0.10);
+    --controlBg: rgba(11,18,32,0.05);
+    --badgeBg: rgba(11,18,32,0.04);
+    --shadowSoft: 0 18px 60px rgba(0,0,0,.10);
     }
 
     /* Fondo global cambia según tema */
@@ -358,4 +367,49 @@
     :root[data-theme="light"] select option{
     color: #111 !important;
     background: #fff !important;
+    }
+
+
+        /* ================================
+    RECHARTS FIX (Products): textos visibles
+    ================================ */
+
+    /* Asegura que TODOS los textos dentro del SVG se vean */
+    .products-wrap .recharts-wrapper text,
+    .products-wrap .recharts-wrapper tspan{
+    fill: var(--text) !important;
+    }
+
+    /* Ticks (numeritos de ejes) */
+    .products-wrap .recharts-cartesian-axis-tick-value{
+    fill: var(--muted) !important;
+    }
+
+    /* Labels de ejes (si usas <Label/>) */
+    .products-wrap .recharts-label,
+    .products-wrap .recharts-cartesian-axis-label{
+    fill: var(--muted) !important;
+    }
+
+    /* Leyenda */
+    .products-wrap .recharts-legend-item-text{
+    color: var(--muted) !important;
+    }
+
+    /* Tooltip */
+    .products-wrap .recharts-default-tooltip{
+    background: var(--panel2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    }
+    .products-wrap .recharts-default-tooltip *{
+    color: var(--text) !important;
+    }
+
+    /* Grid (opcional para contraste en light/dark) */
+    .products-wrap .recharts-cartesian-grid line{
+    stroke: rgba(255,255,255,.10) !important;
+    }
+    :root[data-theme="light"] .products-wrap .recharts-cartesian-grid line{
+    stroke: rgba(11,18,32,.12) !important;
     }

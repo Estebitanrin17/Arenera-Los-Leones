@@ -14,10 +14,6 @@
     .app-shell{
     min-height: 100vh;
     display: flex;
-    background:
-        radial-gradient(1200px 650px at 18% 0%, #18223d 0%, transparent 60%),
-        radial-gradient(900px 540px at 90% 10%, #1b2a4a 0%, transparent 55%),
-        var(--bg);
     color: var(--text);
     font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", Arial;
     }
@@ -38,7 +34,6 @@
     padding: 12px 12px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: rgba(15,23,42,.55);
     backdrop-filter: blur(10px);
     box-shadow: var(--shadow);
     margin-bottom: 14px;
@@ -62,7 +57,6 @@
     padding: 6px 10px;
     border-radius: 999px;
     border: 1px solid var(--border);
-    background: rgba(255,255,255,.06);
     }
 
     /* Sidebar base */
@@ -70,7 +64,6 @@
     width: 280px;
     padding: 14px;
     border-right: 1px solid var(--border);
-    background: rgba(15,23,42,.55);
     backdrop-filter: blur(10px);
     box-shadow: 12px 0 40px rgba(0,0,0,.18);
     height: 100vh;
@@ -112,7 +105,6 @@
     height: 42px;
     border-radius: 14px;
     border: 1px solid var(--border);
-    background: rgba(255,255,255,.06);
     display:flex;
     align-items:center;
     justify-content:center;
@@ -156,8 +148,8 @@
     font-weight: 900;
     padding: 2px 8px;
     border-radius: 999px;
-    background: rgba(255,255,255,.06);
-    border: 1px solid var(--border);
+    background: rgba(228, 46, 46, 0.856);
+    border: 4px solid var(--border);
     }
 
     .sb-top__actions{
@@ -171,7 +163,6 @@
     height: 36px;
     border-radius: 12px;
     border: 1px solid rgba(255,255,255,.14);
-    background: rgba(255,255,255,.06);
     color: var(--text);
     cursor: pointer;
     display:flex;
@@ -435,4 +426,98 @@
     .mobile-only{
         display:flex;
     }
+    }
+
+        /* ===== CONTROLES (input/select) compatibles con dark/light ===== */
+    .input, .select{
+    background: var(--controlBg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    border-radius: 10px;
+    outline: none;
+    }
+
+    .input::placeholder{
+    color: color-mix(in srgb, var(--muted), transparent 25%);
+    }
+
+    /* dropdown nativo: forzamos opciones legibles */
+    .select option,
+    select option{
+    color: #111 !important;
+    background: #fff !important;
+    }
+    .select optgroup,
+    select optgroup{
+    color: #111 !important;
+    background: #fff !important;
+    font-weight: 800;
+    }
+
+    /* flecha del select (se ve en ambos temas) */
+    .select, select.select{
+    -webkit-appearance: none;
+    appearance: none;
+    padding-right: 40px;
+    background-image:
+        linear-gradient(45deg, transparent 50%, currentColor 50%),
+        linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position:
+        calc(100% - 18px) calc(1em + 2px),
+        calc(100% - 12px) calc(1em + 2px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    }
+
+    .input:focus, .select:focus{
+    border-color: color-mix(in srgb, var(--accent), transparent 50%);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent), transparent 82%);
+    }
+
+    /* ===== CARDS / BADGES ===== */
+    .card{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    backdrop-filter: blur(8px);
+    box-shadow: var(--shadowSoft);
+    }
+
+    .badge{
+    border: 1px solid var(--border);
+    background: var(--badgeBg);
+    }
+
+    /* ===== TABLAS (antes usabas border blanco fijo) ===== */
+    .table{
+    width:100%;
+    border-collapse: collapse;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow:hidden;
+    }
+
+    .table th, .table td{
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--rowBorder);
+    text-align: left;
+    font-size: 13px;
+    color: var(--text);
+    }
+    .table th{
+    color: var(--muted);
+    font-weight: 800;
+    }
+
+    /* ===== TOOLTIP Recharts (se ve bien en dark/light) ===== */
+    .recharts-default-tooltip{
+    background: var(--panel2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    box-shadow: var(--shadowSoft) !important;
+    }
+    .recharts-default-tooltip *{
+    color: var(--text) !important;
     }
