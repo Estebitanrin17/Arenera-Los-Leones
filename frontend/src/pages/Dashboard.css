@@ -166,3 +166,41 @@
     color: #111 !important;
     background: #fff !important;
     }
+
+        /* ================================
+    RECHARTS: texto/labels visibles
+    ================================ */
+
+    /* 1) Asegura que el texto del SVG use tu color del tema */
+    .dash .recharts-wrapper text,
+    .dash .recharts-wrapper tspan{
+    fill: var(--text) !important;
+    }
+
+    /* 2) Ticks de ejes (numeritos) */
+    .dash .recharts-cartesian-axis-tick-value{
+    fill: var(--muted) !important;
+    }
+
+    /* 3) Grid un poquito visible (opcional) */
+    .dash .recharts-cartesian-grid line{
+    stroke: rgba(255,255,255,0.10) !important;
+    }
+    :root[data-theme="light"] .dash .recharts-cartesian-grid line{
+    stroke: rgba(11,18,32,0.12) !important;
+    }
+
+    /* 4) Legend */
+    .dash .recharts-legend-item-text{
+    color: var(--muted) !important;
+    }
+
+    /* 5) Tooltip (para que no salga blanco raro) */
+    .dash .recharts-default-tooltip{
+    background: var(--panel2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    }
+    .dash .recharts-default-tooltip *{
+    color: var(--text) !important;
+    }
